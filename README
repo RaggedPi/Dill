@@ -1,0 +1,6 @@
+RaggedPi Project
+Codename: Dill
+
+Freezer thermometer controller
+
+Toggles a relay to engage freezer compressor based on thermometer temperature and a user inputted setting.
