@@ -1,99 +1,64 @@
 /*
   RaggedPi Project
-  Arduino "Dill" - Thermometer controller
+  Arduino "Dill" - Refridgeration thermostat controller
   Written by david durost <david.durost@gmail.com>
 */
+/* Includes */
 #include <Wire.h>
 #include <OneWire.h>
-#include <OneButton.h>
 #include <DallasTemperature.h>
 #include <Relay.h>
-//#include <DHT.h>
+#include <SPI.h>
+#include <SoftwareSerial.h>
 
-// Constants
-#define SDA 5
-#define SDL 6
-#define CS 10
-#define LED 13
-#define DHTPIN 4
-#define FRIDGEPIN 4 // digital pin
-#define UPPIN 8
-#define DNPIN 9
-#define SETPIN 3
-#define GNLEDPIN 6 // digital pin
-#define RDLEDPIN 5 // digital pin
-#define SLEEP_TIME 900000
-#define MAXTEMP 40.00
-#define MINTEMP 32.00
+/* Constants */
+#define SDA 5               // sda`
+#define SDL 6               // sdl
+#define CS 10               // cs
+#define LED 13              // pin
+#define DC 3                // dc
+#define RESET 7             // pin
+#define DHTPIN 4            // analog pin
+#define SLEEP_TIME 90000    // ms
+#define MAXTEMP 46.00       // *F
+#define MINTEMP 40.00       // *F
+#define TEMPOVERUNDER 6.00  // +/- *F
 
-// Enums
+/* Enums */
 enum Modes {
     MONITOR_MODE,
     SLEEP_MODE,
     SETTEMP_MODE
 };
 
-// Objects
-Relay fridge(FRIDGEPIN);
-OneButton upBtn(UPPIN, true);
-OneButton dnBtn(DNPIN, true);
-OneButton setBtn(SETPIN, true);
+/* Objects */
+Relay fridge(RELAY1);
 OneWire oneWire(DHTPIN);
 DallasTemperature sensors(&oneWire);
-// DHT dht(DHTPIN, DHT11);
 
-// Variables
+/* Variables */
 unsigned long sleep = 0;
-float tempSetting = 35.00;
 float tempC = 0;
 float tempF = 0;
+float tempSetting = 42.00;
 bool coolRun = false;
 bool boot = true;
 Modes state = MONITOR_MODE;
 
 /**
- * Increase Temperature
- */
-void increaseTemp() {
-    tempSetting += 1.00;
-
-    if (tempSetting > MAXTEMP) {
-        tempSetting = MAXTEMP;
-    }
-}
-
-/**
- * Decrease temperature
- */
-void decreaseTemp() {
-    tempSetting -= 1.00;
-
-    if (tempSetting <= MINTEMP) {
-        tempSetting = MINTEMP;
-    }
-}
-
-/**
  * Monitor mode
  */
 void monitorMode() {
-    // Set buttons
-    upBtn.attachClick(setTempMode);
-    upBtn.tick();
-    dnBtn.attachClick(setTempMode);
-    dnBtn.tick();
-    setBtn.attachClick(setTempMode);
-    setBtn.tick();
-
-    // Toggle relay
-    if (tempF <= tempSetting) {
-        fridge.on();        
-    }
+    Serial.println("Monitoring...");
 
     readTemps();
     displayTemps(); 
 
     if (tempF > tempSetting) {
+        fridge.on();
+
+        Serial.println("Cooling.");
+
         coolRun = true;
     }
 
@@ -107,44 +72,41 @@ void monitorMode() {
  * Sleep mode
  */
 void sleepMode() {
-    upBtn.attachClick(setTempMode);
-    upBtn.tick();
-    dnBtn.attachClick(setTempMode);
-    dnBtn.tick();
-    setBtn.attachClick(setTempMode);
-    setBtn.tick();
-
+    long sleeptime = millis() - sleep;
     fridge.off();
+    Serial.println("Sleeping...");
+    Serial.print("Sleep time: ");
+    Serial.println(sleeptime);
+
     readTemps();
     displayTemps();
 
-    if (millis() - sleep > SLEEP_TIME) {
+    if (sleeptime > SLEEP_TIME) {
         coolRun = false;
         state = MONITOR_MODE;
     }
 }
 
 /**
- * Set temperature mode
- */
-void setTempMode() {
-    upBtn.attachClick(increaseTemp);
-    upBtn.tick();
-    dnBtn.attachClick(decreaseTemp);
-    dnBtn.tick();
-}
-
-/**
  * Read temperature
  */
 void readTemps() {
-    sensors.requestTemperatures();
-    tempC = sensors.getTempCByIndex(0);
+    //sensors.requestTemperatures();
+    //tempC = sensors.getTempCByIndex(0);
+    tempC = analogRead(DHTPIN);
     tempF = (tempC * 9.0) / 5.0 + 32.0;
 }
 
+/**
+ * Display temps
+ */
 void displayTemps() {
-    // output to display screen
+    Serial.print("Temp: ");
+    Serial.print(tempC);
+    Serial.println("C\t");
+    Serial.print("Temp: ");
+    Serial.print(tempF);
+    Serial.println("F\t");
 }
 
 /**
@@ -153,27 +115,27 @@ void displayTemps() {
 void setup() {
     pinMode(LED, OUTPUT);
     pinMode(CS, OUTPUT);
-    pinMode(GNLEDPIN, OUTPUT);
-    pinMode(RDLEDPIN, OUTPUT);
+    pinMode(DHTPIN, INPUT);
 
-//    dht.begin();
+    Serial.begin(9600);
+
     sensors.begin();
     fridge.begin();
+    Serial.println("Initializing...");    
 }
 
 /**
  * Loop
  */
 void loop() {
+    delay(10000);
+
     switch(state) {
         case MONITOR_MODE:
             monitorMode();
             break;
         case SLEEP_MODE:
             sleepMode();
-            break;
-        case SETTEMP_MODE:
-            setTempMode();
             break;
     }
 }
