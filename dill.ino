@@ -19,7 +19,7 @@
 #define DC 3                // dc
 #define RESET 7             // pin
 #define DHTPIN 4            // analog pin
-#define SLEEP_TIME 90000    // ms
+#define SLEEP_TIME 9000    // ms
 #define MAXTEMP 46.00       // *F
 #define MINTEMP 40.00       // *F
 #define TEMPOVERUNDER 6.00  // +/- *F
@@ -38,8 +38,8 @@ DallasTemperature sensors(&oneWire);
 
 /* Variables */
 unsigned long sleep = 0;
-float tempC = 0;
-float tempF = 0;
+float tempC = 0.00;
+float tempF = 0.00;
 float tempSetting = 42.00;
 bool coolRun = false;
 bool boot = true;
