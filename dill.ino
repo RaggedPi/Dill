@@ -19,7 +19,7 @@
 #define LED 13              // pin
 #define DC 3                // dc
 #define RESET 7             // pin
-#define DHTPIN 4            // analog pin
+#define DHTPIN 3            // digital pin
 #define SLEEP_TIME 9000     // ms
 #define MAXTEMP 46.00       // *F
 #define MINTEMP 40.00       // *F
@@ -31,6 +31,8 @@
 #define LEFT_BTN 4
 #define RIGHT_BTN 1
 #define SELECT_BTN 5
+#define LCD_COLS 16
+#define LCD_ROWS 2
 
 /* Enums */
 enum Modes {
@@ -41,9 +43,10 @@ enum Modes {
 };
 
 /* Objects */
-Relay fridge(RELAY1);
+Relay fridge(RELAYPIN);
 OneWire oneWire(DHTPIN);
 DallasTemperature sensors(&oneWire);
+DeviceAddress thermometer;
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 /* Variables */
@@ -64,11 +67,13 @@ bool override = false;
  * @param  int startChar default= 0
  * @param  int endChar  default=16
  */
-void clearLine(int line=0, int startChar=0, int endChar=16) {
-    lcd.setCursor(startChar, line);
-    if (0 != startChar && 16 > startChar) startChar -= 16;
-    else    startChar = endChar;
-    for(int x=0; x < endChar; x++)   lcd.write(' ');  
+void clearLine(int line=0, int startChar=0, int endChar=LCD_COLS) {
+    if (LCD_ROWS > line) {
+        lcd.setCursor(startChar, line);
+        if (0 != startChar && LCD_COLS > startChar) startChar -= LCD_COLS;
+        else    startChar = endChar;
+        for(int x=0; x < endChar; x++)   lcd.write(' ');
+    }
 }
 
 /**
@@ -93,6 +98,9 @@ void saveTempSetting() {
     tempSetting = newTempSetting;
     lcd.clear();
     lcd.print("Temp saved.");
+    Serial.print("New temperature saved: ");
+    Serial.print(tempSetting);
+    Serial.println("F");
     delay(3000);
     state = MONITOR_MODE;
 }
@@ -129,10 +137,11 @@ void btnAction() {
  * Read temperature
  */
 void readTemps() {
-    //sensors.requestTemperatures();
-    //tempC = sensors.getTempCByIndex(0);
-    tempC = analogRead(DHTPIN);
-    tempF = (tempC * 9.0) / 5.0 + 32.0;
+    sensors.requestTemperatures();
+    tempC = sensors.getTempC(thermometer);
+    //tempC = analogRead(DHTPIN);
+    //tempF = (tempC * 9.0) / 5.0 + 32.0;
+    tempF = DallasTemperature::toFahrenheit(tempC);
 }
 
 /**
@@ -152,8 +161,8 @@ void drawTemp() {
 int readLCDBtns() {
     uint8_t btn = analogRead(BTNPIN);
 
-    lcd.clear();
-    lcd.print(btn);
+    //lcd.clear();
+    //lcd.print(btn);
     switch(btn) {
         case 50:
             return RIGHT_BTN;
@@ -276,20 +285,25 @@ void displayTemps() {
 void setup() {
     pinMode(LED, OUTPUT);
     pinMode(CS, OUTPUT);
-    pinMode(DHTPIN, INPUT);
+    //pinMode(DHTPIN, INPUT);
     for(int i=4;i<10;i++){
         pinMode(i,OUTPUT);
     }
 
     Serial.begin(9600);
 
-    sensors.begin();
     fridge.begin();
     Serial.println("Initializing...");    
-    lcd.begin(16, 2);
+    
+    lcd.begin(LCD_COLS, LCD_ROWS);
     digitalWrite(CS, HIGH);
     lcd.setCursor(0, 0);
     lcd.print("Initializing...");
+    
+    sensors.begin();
+    if (!sensors.getAddress(thermometer, 0))
+        Serial.println("[ERROR] Could not obtain thermometer device address (dev 0)");
+    sensors.setResolution(thermometer, 9);
 }
 
 /**
